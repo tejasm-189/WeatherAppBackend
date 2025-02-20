@@ -1,16 +1,18 @@
 ﻿using MongoDB.Driver;
 using MongoDB.Bson;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver.Core.Configuration;
 
 public class MongoService
 {
     private readonly IMongoCollection<FavoriteCity> _favoritesCollection;
 
-    public MongoService(IConfiguration config)
+    private readonly MongoClient _mongoclient;
+    public MongoService(string ConnectionString, string Database, string CollectionName)
     {
-        var client = new MongoClient(config["MongoDB:ConnectionString"]);
-        var database = client.GetDatabase(config["MongoDB:Database"]);
-        _favoritesCollection = database.GetCollection<FavoriteCity>(config["MongoDB:CollectionName"]);
+        var client = new MongoClient(ConnectionString);
+        var database = client.GetDatabase(Database);
+        _favoritesCollection = database.GetCollection<FavoriteCity>(CollectionName);
     }
 
     public async Task<List<FavoriteCity>> GetFavorites(string userId)

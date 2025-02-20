@@ -24,8 +24,11 @@
 
 //}
 
+using System.Collections;
 using System.Net.Http;
 using System.Threading.Tasks;
+using MongoDB.Driver.Core.Configuration;
+using MongoDB.Driver;
 using Newtonsoft.Json.Linq;
 
 public class WeatherService
@@ -34,14 +37,11 @@ public class WeatherService
     private readonly string _openWeatherApiKey;
     private readonly string _openWeatherBaseUrl;
 
-
-
-    public WeatherService(HttpClient httpClient, IConfiguration config)
+    public WeatherService(HttpClient httpClient,string Key, string BaseUrl)
     {
         _httpClient = httpClient;
-
-        _openWeatherApiKey = config["OpenWeatherAPI:Key"]; // Store API Key in appsettings.json
-        _openWeatherBaseUrl = config["OpenWeatherAPI:BaseUrl"];// Store Url in the appsettings.json
+        _openWeatherApiKey = Key; // Store API Key in appsettings.json
+        _openWeatherBaseUrl =BaseUrl;// Store Url in the appsettings.json
 
     }
     public async Task<string> IsValidCity(string city)
