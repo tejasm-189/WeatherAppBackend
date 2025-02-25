@@ -1,9 +1,22 @@
+using Supabase;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add HttpClient registration so that HttpClient can be injected.
+// Add HttpClient
 builder.Services.AddHttpClient();
 
-// Add services to the container.
+// Register Supabase Client as a singleton with DI
+builder.Services.AddSingleton(sp =>
+{
+    var url = Environment.GetEnvironmentVariable("SUPABASE_URL") ?? builder.Configuration["Supabase:Url"];
+    var serviceRoleKey = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY") ?? builder.Configuration["Supabase:ServiceRoleKey"];
+    var options = new Supabase.SupabaseOptions { AutoConnectRealtime = false }; // Realtime not needed here
+    return new Supabase.Client(url, serviceRoleKey, options);
+});
+
+// Register custom services
 builder.Services.AddScoped<WeatherService>(sp =>
 {
     var weatherSettings = builder.Configuration.GetSection("OpenWeatherAPI");
@@ -12,20 +25,6 @@ builder.Services.AddScoped<WeatherService>(sp =>
         httpClient,
         weatherSettings["Key"] ?? Environment.GetEnvironmentVariable("KEY"),
         weatherSettings["BaseUrl"] ?? Environment.GetEnvironmentVariable("BASE_URL"));
-});
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
 });
 
 builder.Services.AddScoped<MongoService>(sp =>
@@ -37,37 +36,49 @@ builder.Services.AddScoped<MongoService>(sp =>
         mongoSettings["UserCollectionName"] ?? Environment.GetEnvironmentVariable("COLLECTIONSTRING"));
 });
 
+builder.Services.AddScoped<FavoriteCitiesSyncService>();
 
-var url = Environment.GetEnvironmentVariable("https://zvyiblbxzuftnvoqipir.supabase.co");
-var key = Environment.GetEnvironmentVariable("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2eWlibGJ4enVmdG52b3FpcGlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg4NDIzOTMsImV4cCI6MjA1NDQxODM5M30._9d4-EYC6y95nkqE2oFArnEm68OZVYFsYbVa1L2erx8");
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-var options = new Supabase.SupabaseOptions
+builder.Services.AddCors(options =>
 {
-    AutoConnectRealtime = true
-};
-
-var supabase = new Supabase.Client(url, key, options);
-await supabase.InitializeAsync();
-
-
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+
+// Initialize Supabase (single instance)
+var supabase = app.Services.GetRequiredService<Supabase.Client>();
+await supabase.InitializeAsync();
+
+
+// Call SyncFavoriteCitiesAsync on startup
+using (var scope = app.Services.CreateScope())
+{
+    var syncService = scope.ServiceProvider.GetRequiredService<FavoriteCitiesSyncService>();
+    await syncService.SyncFavoriteCitiesAsync();
+}
+
+
+
 app.UseCors("AllowAll");
-
-app.UseRouting();
-
 app.UseHttpsRedirection();
-
+app.UseRouting();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
+

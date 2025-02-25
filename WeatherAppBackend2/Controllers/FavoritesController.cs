@@ -20,6 +20,8 @@
             return Ok(favorites);
         }
 
+
+
         [HttpPost]
         public async Task<IActionResult> AddFavorite([FromBody] FavoriteCity favorite)
         {
